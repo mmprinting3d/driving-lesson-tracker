@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Driving Tracker</title>
+
+<style>
+:root {
+  --bg:#0f172a;
+  --card:#1e293b;
+  --blue:#3b82f6;
+  --green:#22c55e;
+}
+
+body {
+  margin:0;
+  font-family:Arial;
+  background:var(--bg);
+  color:white;
+}
+
+.container {
+  padding:16px;
+  padding-bottom:90px;
+}
+
+.card {
+  background:var(--card);
+  padding:16px;
+  border-radius:14px;
+  margin-bottom:12px;
+}
+
+button,input {
+  width:100%;
+  height:52px;
+  margin-top:10px;
+  border:none;
+  border-radius:12px;
+  font-size:16px;
+}
+
+button { background:var(--blue); color:white; }
+.green { background:var(--green); }
+.red { background:#ef4444; }
+
+.nav {
+  position:fixed;
+  bottom:0;
+  width:100%;
+  display:flex;
+  background:var(--card);
+}
+
+.nav button { flex:1; border-radius:0; }
+
+.badge {
+  padding:4px 10px;
+  border-radius:6px;
+  font-size:12px;
+}
+
+.me { background:var(--blue); }
+.mom { background:var(--green); }
+.split { background:orange; }
+</style>
+</head>
+
+<body>
+
+<div id="app" class="container"></div>
+
+<div class="nav">
+  <button onclick="show('dashboard')">Home</button>
+  <button onclick="show('log')">Log</button>
+  <button onclick="show('add')">Add</button>
+  <button onclick="show('calc')">Calc</button>
+</div>
+
+<script>
+
+// ===== SETTINGS =====
+const TARGET = 30; // lessons
+const LESSONS_PER_ENTRY = 2;
+const DOUBLE = 370;
+const HALF = 185;
+
+// ===== BUDGET =====
+function loadBudget(){
+  return JSON.parse(localStorage.getItem("momBudget")) || 1300;
+}
+
+function saveBudget(){
+  localStorage.setItem("momBudget", JSON.stringify(momCommitted));
+}
+
+let momCommitted = loadBudget();
+
+// ===== DATA =====
+function load(){
+  return JSON.parse(localStorage.getItem("lessons")) || [
+    {date:"2026-01-11",payer:"me"},
+    {date:"2026-01-18",payer:"mom"},
+    {date:"2026-02-04",payer:"me"},
+    {date:"2026-02-09",payer:"split"},
+    {date:"2026-02-18",payer:"me"},
+    {date:"2026-02-22",payer:"me"}
+  ];
+}
+
+function save(){
+  localStorage.setItem("lessons",JSON.stringify(lessons));
+}
+
+let lessons = load();
+
+// ===== LOGIC =====
+function totalLessons(){
+  return lessons.length * LESSONS_PER_ENTRY;
+}
+
+function calcSpending(){
+  let me = 0;
+  let mom = 0;
+
+  lessons.forEach(l=>{
+    if(l.payer==="me") me += DOUBLE;
+    if(l.payer==="mom") mom += DOUBLE;
+    if(l.payer==="split"){
+      me += HALF;
+      mom += HALF;
+    }
+  });
+
+  return {me, mom};
+}
+
+function totalSpent(){
+  const {me,mom}=calcSpending();
+  return me + mom;
+}
+
+function remaining(){
+  return (TARGET * HALF) - totalSpent();
+}
+
+// ===== NAV =====
+function show(s){
+  if(s==="dashboard")dashboard();
+  if(s==="log")log();
+  if(s==="add")addScreen();
+  if(s==="calc")calcScreen();
+}
+
+// ===== DASHBOARD =====
+function dashboard(){
+  document.getElementById("app").innerHTML=`
+    <div class="card">
+      <h3>📈 Lessons Progress</h3>
+      <p>${totalLessons()} / ${TARGET}</p>
+      <div style="background:#334155;height:14px;border-radius:8px;">
+        <div id="progressBar" style="height:100%;background:#3b82f6;"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>💰 Remaining Cost</h3>
+      <h1>${remaining()}₪</h1>
+    </div>
+
+    <div class="card">
+      <h3>📊 Spending</h3>
+
+      <p>💙 You: <b id="meSpent"></b></p>
+      <div style="background:#334155;height:12px;">
+        <div id="meBar" style="height:100%;background:#3b82f6;"></div>
+      </div>
+
+      <br>
+
+      <p>💚 Mom: <b id="momSpent"></b> / <b id="momBudget"></b></p>
+      <div style="background:#334155;height:12px;">
+        <div id="momBar" style="height:100%;background:#22c55e;"></div>
+      </div>
+
+      <button onclick="editBudget()">Edit Mom Budget</button>
+    </div>
+  `;
+
+  updateUI();
+}
+
+// ===== UPDATE UI =====
+function updateUI(){
+  let progress = (totalLessons()/TARGET)*100;
+  document.getElementById("progressBar").style.width = progress+"%";
+
+  const {me,mom}=calcSpending();
+
+  document.getElementById("meSpent").innerText="₪"+me;
+  document.getElementById("momSpent").innerText="₪"+mom;
+  document.getElementById("momBudget").innerText="₪"+momCommitted;
+
+  document.getElementById("meBar").style.width=(me/(TARGET*HALF))*100+"%";
+  document.getElementById("momBar").style.width=(mom/momCommitted)*100+"%";
+}
+
+// ===== CALCULATOR =====
+function calcScreen(){
+  document.getElementById("app").innerHTML=`
+    <div class="card">
+      <input type="number" id="money" placeholder="₪ amount">
+      <button onclick="calculate()">Calculate</button>
+      <div id="result"></div>
+    </div>
+  `;
+}
+
+function calculate(){
+  let money=parseFloat(document.getElementById("money").value);
+
+  let doubles=Math.floor(money/DOUBLE);
+  let rem=money-(doubles*DOUBLE);
+  let singles=Math.floor(rem/HALF);
+
+  document.getElementById("result").innerHTML=
+    "Double: "+doubles+"<br>Single: "+singles;
+}
+
+// ===== OTHER =====
+function editBudget(){
+  let val=prompt("Budget:",momCommitted);
+  if(val===null)return;
+  momCommitted=parseFloat(val);
+  saveBudget();
+  show("dashboard");
+}
+
+function log(){
+  document.getElementById("app").innerHTML=
+    lessons.map((l,i)=>`
+      <div class="card">
+        ${l.date}<br>
+        <span class="badge ${l.payer}">${l.payer}</span>
+        <button onclick="del(${i})">Delete</button>
+      </div>
+    `).join("");
+}
+
+function addScreen(){
+  document.getElementById("app").innerHTML=`
+    <div class="card">
+      <input type="date" id="date">
+      <button onclick="add('me')">Me</button>
+      <button onclick="add('mom')">Mom</button>
+      <button onclick="add('split')">Split</button>
+    </div>
+  `;
+}
+
+function add(payer){
+  let date=document.getElementById("date").value;
+  lessons.push({date,payer});
+  save();
+  show("dashboard");
+}
+
+function del(i){
+  lessons.splice(i,1);
+  save();
+  show("log");
+}
+
+// START
+show("dashboard");
+
+</script>
+</body>
+</html>
