@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Driving Tracker</title>
+<title>Driving Tracker 🪪</title>
 
-<!-- 🪪 TAB ICON -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🪪</text></svg>">
 
 <style>
@@ -27,7 +26,7 @@ body {
 
 .container {
   width:100%;
-  max-width:900px;
+  max-width:1000px;
   padding:20px;
 }
 
@@ -45,17 +44,17 @@ body {
 
 .full { grid-column: span 2; }
 
-button,input {
+button {
   width:100%;
   height:50px;
   margin-top:10px;
   border:none;
   border-radius:12px;
   font-size:15px;
+  background:var(--blue);
+  color:white;
+  cursor:pointer;
 }
-
-button { background:var(--blue); color:white; cursor:pointer; }
-.green { background:var(--green); }
 
 .progress {
   background:#334155;
@@ -66,16 +65,17 @@ button { background:var(--blue); color:white; cursor:pointer; }
 
 .bar { height:100%; }
 
-.nav {
-  position:fixed;
-  bottom:0;
-  width:100%;
-  max-width:900px;
-  display:flex;
-  background:var(--card);
+.item {
+  padding:8px;
+  margin:5px 0;
+  background:#0f172a;
+  border-radius:8px;
 }
 
-.nav button { flex:1; border-radius:0; }
+/* active filter button */
+.active {
+  outline:2px solid white;
+}
 </style>
 </head>
 
@@ -83,151 +83,136 @@ button { background:var(--blue); color:white; cursor:pointer; }
 
 <div id="app" class="container"></div>
 
-<div class="nav">
-  <button onclick="show('dashboard')">Home</button>
-  <button onclick="show('add')">Add</button>
-</div>
-
 <script>
 
-// ===== 🔐 CONFIG =====
-const GIST_ID = "mmprinting3d/8d5f490d59f7e7c21e12a60201ac6d93.js";
-const TOKEN = "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";
-
 // ===== SETTINGS =====
-const TARGET = 30;
-const LESSONS_PER_ENTRY = 2;
-const DOUBLE = 370;
-const HALF = 185;
+const LESSON_PRICE = 185;
+const TARGET = 37.5;
+
+// ===== COSTS =====
+const COSTS = {
+  signup: 200,
+  internal: 200,
+  external: 361,
+  license: 94
+};
 
 // ===== DATA =====
-let lessons = [];
-let momCommitted = 1300;
+let lessons = [
+  { date: "2026-01-11", type: "me" },
+  { date: "2026-01-18", type: "mom" },
+  { date: "2026-02-02", type: "me" },
+  { date: "2026-02-09", type: "split" },
+  { date: "2026-02-18", type: "me" },
+  { date: "2026-02-22", type: "me" },
+  { date: "2026-04-12", type: "me" }
+];
 
-// ===== GITHUB LOAD =====
-async function loadFromGitHub(){
-  const res = await fetch(`https://api.github.com/gists/${GIST_ID}`);
-  const gist = await res.json();
+// ===== FILTER =====
+let filter = "all";
 
-  const content = gist.files["driving.json"].content;
-  const data = JSON.parse(content);
-
-  lessons = data.lessons || [];
-  momCommitted = data.momCommitted || 1300;
-}
-
-// ===== GITHUB SAVE =====
-async function saveToGitHub(){
-  const data = {
-    lessons,
-    momCommitted
-  };
-
-  await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-    method: "PATCH",
-    headers: {
-      "Authorization": "token " + TOKEN,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      files: {
-        "driving.json": {
-          content: JSON.stringify(data, null, 2)
-        }
-      }
-    })
-  });
+// ===== SAVE =====
+function save(){
+  localStorage.setItem("lessons", JSON.stringify(lessons));
 }
 
 // ===== LOGIC =====
 function totalLessons(){
-  return lessons.length * LESSONS_PER_ENTRY;
+  return lessons.length;
 }
 
-function calcSpending(){
-  let me=0, mom=0;
-
-  lessons.forEach(l=>{
-    if(l.payer==="me") me+=DOUBLE;
-    if(l.payer==="mom") mom+=DOUBLE;
-    if(l.payer==="split"){ me+=HALF; mom+=HALF; }
-  });
-
-  return {me,mom};
+function lessonCost(){
+  return totalLessons() * LESSON_PRICE;
 }
 
-function remaining(){
-  return (TARGET * HALF) - (calcSpending().me + calcSpending().mom);
+function grandTotal(){
+  return lessonCost() +
+    COSTS.signup +
+    COSTS.internal +
+    COSTS.external +
+    COSTS.license;
+}
+
+// ===== FILTER =====
+function setFilter(f){
+  filter = f;
+  show();
 }
 
 // ===== UI =====
-function show(s){
-  if(s==="dashboard")dashboard();
-  if(s==="add")addScreen();
-}
-
-function dashboard(){
-  const {me,mom} = calcSpending();
+function show(){
 
   document.getElementById("app").innerHTML=`
-    <div class="grid">
 
-      <div class="card full">
-        <h2>Lessons</h2>
-        ${totalLessons()} / ${TARGET}
-        <div class="progress">
-          <div class="bar" style="width:${(totalLessons()/TARGET)*100}%;background:var(--blue);"></div>
-        </div>
+  <div class="grid">
+
+    <!-- PROGRESS -->
+    <div class="card full">
+      <h2>📊 Progress</h2>
+      ${totalLessons()} / ${TARGET}
+      <div class="progress">
+        <div class="bar" style="width:${(totalLessons()/TARGET)*100}%;background:var(--blue);"></div>
       </div>
-
-      <div class="card">
-        <h2>Remaining</h2>
-        <h1>${remaining()}₪</h1>
-      </div>
-
-      <div class="card">
-        <h2>Quick Add</h2>
-        <button onclick="quickAdd('me')">I Paid</button>
-        <button class="green" onclick="quickAdd('mom')">Mom Paid</button>
-        <button onclick="quickAdd('split')">Split</button>
-      </div>
-
-      <div class="card">
-        <h3>You</h3>
-        ₪${me}
-      </div>
-
-      <div class="card">
-        <h3>Mom</h3>
-        ₪${mom} / ₪${momCommitted}
-      </div>
-
     </div>
-  `;
-}
 
-function addScreen(){
-  document.getElementById("app").innerHTML=`
+    <!-- ADD -->
     <div class="card">
-      <button onclick="quickAdd('me')">Add (Me)</button>
-      <button onclick="quickAdd('mom')">Add (Mom)</button>
-      <button onclick="quickAdd('split')">Add (Split)</button>
+      <h2>➕ Add Lesson</h2>
+      <button onclick="add('me')">Me</button>
+      <button onclick="add('mom')">Mom</button>
+      <button onclick="add('split')">Split</button>
     </div>
+
+    <!-- COST -->
+    <div class="card">
+      <h2>💰 Cost</h2>
+      <p>Lessons: ₪${lessonCost()}</p>
+      <h3>Total: ₪${grandTotal()}</h3>
+    </div>
+
+    <!-- FILTER -->
+    <div class="card full">
+      <h3>🔍 Filter</h3>
+      <button class="${filter==='all'?'active':''}" onclick="setFilter('all')">All</button>
+      <button class="${filter==='me'?'active':''}" onclick="setFilter('me')">Me</button>
+      <button class="${filter==='mom'?'active':''}" onclick="setFilter('mom')">Mom</button>
+      <button class="${filter==='split'?'active':''}" onclick="setFilter('split')">Split</button>
+    </div>
+
+    <!-- LOG -->
+    <div class="card full">
+      <h3>📅 Lesson Log</h3>
+
+      ${
+        lessons
+          .filter(l => filter === "all" || l.type === filter)
+          .map((l,i)=>`
+            <div class="item">
+              #${i+1} — ${l.date} — ${l.type}
+            </div>
+          `).join("")
+      }
+
+    </div>
+
+  </div>
+
   `;
 }
 
-// ===== ACTION =====
-async function quickAdd(payer){
-  let today = new Date().toISOString().split("T")[0];
+// ===== ACTIONS =====
+function add(type){
+  lessons.push({
+    date:new Date().toISOString().split("T")[0],
+    type
+  });
 
-  lessons.push({date:today,payer});
-
-  await saveToGitHub();
-  show("dashboard");
+  save();
+  show();
 }
 
-// ===== START =====
-loadFromGitHub().then(()=>show("dashboard"));
+// START
+show();
 
 </script>
 
