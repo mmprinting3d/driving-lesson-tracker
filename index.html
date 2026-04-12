@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Driving Tracker 🪪</title>
+<title>Driving Tracker</title>
 
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🪪</text></svg>">
 
@@ -13,6 +13,7 @@
   --card:#1e293b;
   --blue:#3b82f6;
   --green:#22c55e;
+  --orange:#f59e0b;
 }
 
 body {
@@ -72,9 +73,25 @@ button {
   border-radius:8px;
 }
 
-/* active filter button */
 .active {
   outline:2px solid white;
+}
+
+/* calendar */
+.calendar {
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:6px;
+}
+
+.day {
+  height:40px;
+  border-radius:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:12px;
+  background:#1e293b;
 }
 </style>
 </head>
@@ -85,11 +102,11 @@ button {
 
 <script>
 
-// ===== SETTINGS =====
+// ================= SETTINGS =================
 const LESSON_PRICE = 185;
 const TARGET = 37.5;
 
-// ===== COSTS =====
+// ================= COSTS =================
 const COSTS = {
   signup: 200,
   internal: 200,
@@ -97,8 +114,8 @@ const COSTS = {
   license: 94
 };
 
-// ===== DATA =====
-let lessons = [
+// ================= DATA =================
+let lessons = JSON.parse(localStorage.getItem("lessons")) || [
   { date: "2026-01-11", type: "me" },
   { date: "2026-01-18", type: "mom" },
   { date: "2026-02-02", type: "me" },
@@ -108,21 +125,29 @@ let lessons = [
   { date: "2026-04-12", type: "me" }
 ];
 
-// ===== FILTER =====
+// ================= FILTER =================
 let filter = "all";
 
-// ===== SAVE =====
+// ================= SAVE =================
 function save(){
   localStorage.setItem("lessons", JSON.stringify(lessons));
 }
 
-// ===== LOGIC =====
-function totalLessons(){
-  return lessons.length;
+// ================= LOGIC =================
+function lessonUnits(){
+  let total = 0;
+
+  lessons.forEach(l=>{
+    if(l.type === "me") total += 1;
+    if(l.type === "mom") total += 1;
+    if(l.type === "split") total += 2;
+  });
+
+  return total;
 }
 
 function lessonCost(){
-  return totalLessons() * LESSON_PRICE;
+  return lessonUnits() * LESSON_PRICE;
 }
 
 function grandTotal(){
@@ -133,31 +158,79 @@ function grandTotal(){
     COSTS.license;
 }
 
-// ===== FILTER =====
+// ================= ACTIONS =================
+function add(type){
+  lessons.push({
+    date: new Date().toISOString().split("T")[0],
+    type
+  });
+
+  save();
+  show();
+}
+
 function setFilter(f){
   filter = f;
   show();
 }
 
-// ===== UI =====
+// ================= CALENDAR =================
+function renderCalendar(){
+
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth();
+
+  const first = new Date(y,m,1);
+  const last = new Date(y,m+1,0);
+
+  let html = "<div class='calendar'>";
+
+  for(let i=0;i<first.getDay();i++){
+    html += "<div></div>";
+  }
+
+  for(let d=1; d<=last.getDate(); d++){
+
+    let date = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+    let l = lessons.find(x=>x.date===date);
+
+    let color = "";
+    if(l?.type==="me") color="#3b82f6";
+    if(l?.type==="mom") color="#22c55e";
+    if(l?.type==="split") color="#f59e0b";
+
+    html += `
+      <div class="day" style="background:${color || '#1e293b'}">
+        ${d}
+      </div>
+    `;
+  }
+
+  html += "</div>";
+  return html;
+}
+
+// ================= UI =================
 function show(){
 
-  document.getElementById("app").innerHTML=`
+  document.getElementById("app").innerHTML = `
 
   <div class="grid">
 
     <!-- PROGRESS -->
     <div class="card full">
       <h2>📊 Progress</h2>
-      ${totalLessons()} / ${TARGET}
+      ${lessonUnits()} / ${TARGET}
       <div class="progress">
-        <div class="bar" style="width:${(totalLessons()/TARGET)*100}%;background:var(--blue);"></div>
+        <div class="bar" style="width:${(lessonUnits()/TARGET)*100}%;background:var(--blue);"></div>
       </div>
     </div>
 
     <!-- ADD -->
     <div class="card">
-      <h2>➕ Add Lesson</h2>
+      <h2>➕ Add</h2>
       <button onclick="add('me')">Me</button>
       <button onclick="add('mom')">Mom</button>
       <button onclick="add('split')">Split</button>
@@ -179,39 +252,33 @@ function show(){
       <button class="${filter==='split'?'active':''}" onclick="setFilter('split')">Split</button>
     </div>
 
+    <!-- CALENDAR -->
+    <div class="card full">
+      <h3>📅 Calendar</h3>
+      ${renderCalendar()}
+    </div>
+
     <!-- LOG -->
     <div class="card full">
-      <h3>📅 Lesson Log</h3>
-
+      <h3>📋 Log</h3>
       ${
         lessons
-          .filter(l => filter === "all" || l.type === filter)
+          .filter(l => filter==="all" || l.type===filter)
           .map((l,i)=>`
             <div class="item">
               #${i+1} — ${l.date} — ${l.type}
             </div>
           `).join("")
       }
-
     </div>
 
   </div>
 
   `;
+
 }
 
-// ===== ACTIONS =====
-function add(type){
-  lessons.push({
-    date:new Date().toISOString().split("T")[0],
-    type
-  });
-
-  save();
-  show();
-}
-
-// START
+// ================= START =================
 show();
 
 </script>
