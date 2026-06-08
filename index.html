@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Driving Lesson Tracker - Israel</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛞</text></svg>">
+    
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -97,7 +100,6 @@
 <header><h1>Driving Lesson Tracker</h1></header>
 
 <div class="container">
-    <!-- HOME PAGE -->
     <section id="page-home" class="page">
         <div class="card">
             <h2><i class="fas fa-road"></i> Lesson Progress</h2>
@@ -125,8 +127,7 @@
         </div>
     </section>
 
-    <!-- LESSONS PAGE -->
-    <section id="page-lessons" class="page">
+    <section id="page-lessons" class="page hidden">
         <div class="card">
             <div class="calendar-header">
                 <button class="cal-btn" onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
@@ -142,7 +143,6 @@
         </div>
     </section>
 
-    <!-- SETTINGS PAGE -->
     <section id="page-settings" class="page hidden">
         <div class="card">
             <h2><i class="fas fa-cog"></i> App Settings</h2>
@@ -155,7 +155,6 @@
     </section>
 </div>
 
-<!-- UNIVERSAL MODAL -->
 <div id="lesson-modal" class="modal hidden">
     <div class="modal-content">
         <h2 id="modal-title">Log Item</h2>
@@ -169,6 +168,8 @@
                     <option value="internal-test">Internal Test (200₪)</option>
                     <option value="external-test">External Test (361₪)</option>
                     <option value="license-fee">License Fee (94₪)</option>
+                    <option value="theory-test">Theory Test (76₪)</option>
+                    <option value="signup-fee">Registration Fee (200₪)</option>
                 </select>
             </div>
             <div class="form-group">
@@ -191,15 +192,14 @@
 </div>
 
 <nav class="bottom-nav">
-    <button class="nav-item" onclick="showPage('home')"><i class="fas fa-home"></i><span>Home</span></button>
-    <button class="nav-item active" onclick="showPage('lessons')"><i class="fas fa-calendar-alt"></i><span>Lessons</span></button>
+    <button class="nav-item active" onclick="showPage('home')"><i class="fas fa-home"></i><span>Home</span></button>
+    <button class="nav-item" onclick="showPage('lessons')"><i class="fas fa-calendar-alt"></i><span>Lessons</span></button>
     <button class="nav-item" onclick="showPage('settings')"><i class="fas fa-cog"></i><span>Settings</span></button>
 </nav>
 
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 
 <script>
     // ==================== FIREBASE CONFIG ====================
@@ -321,7 +321,6 @@
                 syncEnabled = true;
                 loadFromFirebase();
             } else {
-                // Sign in anonymously for personal sync
                 auth.signInAnonymously().catch(error => {
                     console.warn('Firebase not available:', error);
                     syncEnabled = false;
@@ -467,7 +466,6 @@
         if(id === 'lessons') renderCalendar();
     }
 
-    // Initialize on page load
     window.addEventListener('load', () => {
         initializeFirebase();
         calculateStats();
