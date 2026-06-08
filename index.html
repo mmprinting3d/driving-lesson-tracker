@@ -451,8 +451,9 @@
     }
 
     window.addEventListener('load', () => {
-        initializeFirebase();
+        loadFromFirebase();
         calculateStats();
+        updateSyncUI();
     });
 </script>
 </body>
