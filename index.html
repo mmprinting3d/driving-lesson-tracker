@@ -199,7 +199,6 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 
 <script>
     // ==================== FIREBASE CONFIG ====================
@@ -214,10 +213,9 @@
     };
 
     firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
     const db = firebase.database();
     
-    let syncEnabled = false;
+    let syncEnabled = true;
     let lastSyncTime = null;
 
     // ==================== APP CODE ====================
@@ -250,16 +248,18 @@
 
     function saveToFirebase() {
         if (!syncEnabled || !auth.currentUser) return;
-        
-        db.ref('users/' + auth.currentUser.uid + '/data').set({
+        db.ref('drivingTracker/data').set({
             entries: state.entries,
             lastUpdated: new Date().toISOString()
-        }).then(() => {
+         }).then(() => {
             lastSyncTime = new Date();
             updateSyncUI();
-        }).catch(error => console.error('Firebase save error:', error));
+         }).catch(error => {
+            console.error('Firebase save error:', error);
+            syncEnabled = false;
+            updateSyncUI();
+        });
     }
-
     function loadFromFirebase() {
         if (!auth.currentUser) {
             syncEnabled = false;
@@ -267,7 +267,7 @@
             return;
         }
 
-        db.ref('users/' + auth.currentUser.uid + '/data').on('value', snapshot => {
+        db.ref('drivingTracker/data').on('value', snapshot => {
             if (snapshot.exists()) {
                 const data = snapshot.val();
                 if (data.entries) {
@@ -313,37 +313,6 @@
             lastSyncEl.textContent = 'Last sync: ' + lastSyncTime.toLocaleTimeString();
         }
     }
-
-    // ==================== ANONYMOUS AUTH ====================
-function initializeFirebase() {
-    console.log("Initializing Firebase...");
-
-    auth.onAuthStateChanged(user => {
-        console.log("Auth state changed:", user);
-
-        if (user) {
-            console.log("Logged in anonymously:", user.uid);
-            syncEnabled = true;
-            loadFromFirebase();
-        } else {
-            console.log("No user, attempting anonymous sign-in...");
-
-            auth.signInAnonymously()
-                .then((result) => {
-                    console.log("Anonymous login successful!", result.user.uid);
-                })
-                .catch((error) => {
-                    console.error("Firebase Auth Error");
-                    console.error("Code:", error.code);
-                    console.error("Message:", error.message);
-                    console.error(error);
-
-                    syncEnabled = false;
-                    updateSyncUI();
-                });
-        }
-    });
-}
 
     // ==================== EXISTING FUNCTIONS ====================
     function resetData() {
