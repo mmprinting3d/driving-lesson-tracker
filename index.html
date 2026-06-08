@@ -247,7 +247,6 @@
     }
 
     function saveToFirebase() {
-        if (!syncEnabled || !auth.currentUser) return;
         db.ref('drivingTracker/data').set({
             entries: state.entries,
             lastUpdated: new Date().toISOString()
@@ -296,35 +295,12 @@
         updateSyncUI();
     });
 }
-        }
-
-        db.ref('drivingTracker/data').on('value', snapshot => {
-            if (snapshot.exists()) {
-                const data = snapshot.val();
-                if (data.entries) {
-                    state.entries = data.entries;
-                    localStorage.setItem('driving_tracker_v4', JSON.stringify(state));
-                    calculateStats();
-                }
-                lastSyncTime = new Date(data.lastUpdated);
-                syncEnabled = true;
-                updateSyncUI();
-            } else {
-                syncEnabled = false;
-                updateSyncUI();
-            }
-        }, error => {
-            console.error('Firebase load error:', error);
-            syncEnabled = false;
-            updateSyncUI();
-        });
-    }
-
+    
     function updateSyncUI() {
         const statusEl = document.getElementById('sync-status');
         const textEl = document.getElementById('sync-text');
         
-        if (syncEnabled && auth.currentUser) {
+        if (syncEnabled) {
             statusEl.classList.add('online');
             statusEl.classList.remove('offline');
             textEl.textContent = 'Synced ✓';
