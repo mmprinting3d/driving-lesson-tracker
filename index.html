@@ -81,9 +81,18 @@
 
         .hidden { display: none; }
         .remaining-box { margin-top: 15px; padding: 10px; background: #fdf2f2; border-left: 4px solid var(--danger); border-radius: 4px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+        
+        .sync-status { 
+            position: fixed; top: 70px; right: 10px; font-size: 0.75rem; padding: 6px 12px; 
+            background: #e0e0e0; border-radius: 4px; z-index: 999; display: flex; align-items: center; gap: 4px;
+        }
+        .sync-status.online { background: #d4edda; color: #155724; }
+        .sync-status.offline { background: #f8d7da; color: #721c24; }
     </style>
 </head>
 <body>
+
+<div id="sync-status" class="sync-status offline"><i class="fas fa-sync-alt"></i> <span id="sync-text">Loading...</span></div>
 
 <header><h1>Driving Lesson Tracker</h1></header>
 
@@ -138,6 +147,10 @@
         <div class="card">
             <h2><i class="fas fa-cog"></i> App Settings</h2>
             <button class="btn-outline" onclick="resetData()">Reset to Default State</button>
+            <div style="margin-top: 20px; padding: 10px; background: #f0f0f0; border-radius: 8px; font-size: 0.85rem;">
+                <p><strong>Sync Status:</strong> <span id="settings-sync-status">Checking...</span></p>
+                <p id="last-sync" style="margin-top: 8px; color: var(--secondary);"></p>
+            </div>
         </div>
     </section>
 </div>
@@ -183,7 +196,31 @@
     <button class="nav-item" onclick="showPage('settings')"><i class="fas fa-cog"></i><span>Settings</span></button>
 </nav>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+
 <script>
+    // ==================== FIREBASE CONFIG ====================
+    const firebaseConfig = {
+        apiKey: "AIzaSyAdGCYR03Y9mw9o1YSqMAMmjauoVVyQGBw",
+        authDomain: "driving-lesson-tracker.firebaseapp.com",
+        databaseURL: "https://driving-lesson-tracker-default-rtdb.firebaseio.com",
+        projectId: "driving-lesson-tracker",
+        storageBucket: "driving-lesson-tracker.firebasestorage.app,
+        messagingSenderId: "358324411499",
+        appId: "1:358324411499:web:9d91f19727d4438735a52e"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+    
+    let syncEnabled = false;
+    let lastSyncTime = null;
+
+    // ==================== APP CODE ====================
     const TARGET_SINGLE_LESSONS = 37.5;
     const TOTAL_PROJECTED = 7868.5;
     let viewDate = new Date();
@@ -197,16 +234,104 @@
             { id: 5, date: "2026-02-18", type: "lesson-double", payer: "Me", booked: false },
             { id: 6, date: "2026-02-22", type: "lesson-double", payer: "Me", booked: false },
             { id: 7, date: "2026-04-12", type: "lesson-double", payer: "Me", booked: false },
-            { id: 8, date: "2026-01-05", type: "theory-test", payer: "Me", booked: false } // Hidden "theory" baseline
+            { id: 8, date: "2026-01-05", type: "theory-test", payer: "Me", booked: false }
         ]
     };
 
     let state = JSON.parse(localStorage.getItem('driving_tracker_v4')) || defaultState;
 
+    // ==================== STORAGE FUNCTIONS ====================
     function saveToStorage() {
         localStorage.setItem('driving_tracker_v4', JSON.stringify(state));
+        if (syncEnabled) {
+            saveToFirebase();
+        }
     }
 
+    function saveToFirebase() {
+        if (!syncEnabled || !auth.currentUser) return;
+        
+        db.ref('users/' + auth.currentUser.uid + '/data').set({
+            entries: state.entries,
+            lastUpdated: new Date().toISOString()
+        }).then(() => {
+            lastSyncTime = new Date();
+            updateSyncUI();
+        }).catch(error => console.error('Firebase save error:', error));
+    }
+
+    function loadFromFirebase() {
+        if (!auth.currentUser) {
+            syncEnabled = false;
+            updateSyncUI();
+            return;
+        }
+
+        db.ref('users/' + auth.currentUser.uid + '/data').on('value', snapshot => {
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                if (data.entries) {
+                    state.entries = data.entries;
+                    localStorage.setItem('driving_tracker_v4', JSON.stringify(state));
+                    calculateStats();
+                }
+                lastSyncTime = new Date(data.lastUpdated);
+                syncEnabled = true;
+                updateSyncUI();
+            } else {
+                syncEnabled = false;
+                updateSyncUI();
+            }
+        }, error => {
+            console.error('Firebase load error:', error);
+            syncEnabled = false;
+            updateSyncUI();
+        });
+    }
+
+    function updateSyncUI() {
+        const statusEl = document.getElementById('sync-status');
+        const textEl = document.getElementById('sync-text');
+        
+        if (syncEnabled && auth.currentUser) {
+            statusEl.classList.add('online');
+            statusEl.classList.remove('offline');
+            textEl.textContent = 'Synced ✓';
+        } else {
+            statusEl.classList.add('offline');
+            statusEl.classList.remove('online');
+            textEl.textContent = 'Local Only';
+        }
+
+        const settingsSync = document.getElementById('settings-sync-status');
+        if (settingsSync) {
+            settingsSync.textContent = syncEnabled ? '✓ Synced to Cloud' : '⚠ Local Storage Only';
+        }
+
+        const lastSyncEl = document.getElementById('last-sync');
+        if (lastSyncEl && lastSyncTime) {
+            lastSyncEl.textContent = 'Last sync: ' + lastSyncTime.toLocaleTimeString();
+        }
+    }
+
+    // ==================== ANONYMOUS AUTH ====================
+    function initializeFirebase() {
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                syncEnabled = true;
+                loadFromFirebase();
+            } else {
+                // Sign in anonymously for personal sync
+                auth.signInAnonymously().catch(error => {
+                    console.warn('Firebase not available:', error);
+                    syncEnabled = false;
+                    updateSyncUI();
+                });
+            }
+        });
+    }
+
+    // ==================== EXISTING FUNCTIONS ====================
     function resetData() {
         if(confirm("Reset everything?")) {
             state = JSON.parse(JSON.stringify(defaultState));
@@ -226,25 +351,21 @@
             'external-test': 361,
             'license-fee': 94,
             'theory-test': 76,
-            'signup-fee': 200 // Assumed mom paid signup
+            'signup-fee': 200
         };
 
-        // Static start values
-        paidMom += 200; // Sign up fee
+        paidMom += 200;
 
         state.entries.forEach(e => {
             if (!e.booked) {
                 let cost = prices[e.type] || 0;
                 
-                // Add lesson counts
                 if (e.type === 'lesson-double') totalSingleLessons += 2;
                 if (e.type === 'lesson-extra') totalSingleLessons += 1.5;
                 
-                // Mark tests as done
                 if (e.type === 'internal-test') internalDone = true;
                 if (e.type === 'external-test') externalDone = true;
 
-                // Track payments
                 if (e.payer === 'Me') paidMe += cost;
                 else if (e.payer === 'Mom') paidMom += cost;
                 else { paidMe += cost/2; paidMom += cost/2; }
@@ -346,7 +467,11 @@
         if(id === 'lessons') renderCalendar();
     }
 
-    window.onload = () => calculateStats();
+    // Initialize on page load
+    window.addEventListener('load', () => {
+        initializeFirebase();
+        calculateStats();
+    });
 </script>
 </body>
 </html>
