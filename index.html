@@ -315,20 +315,35 @@
     }
 
     // ==================== ANONYMOUS AUTH ====================
-    function initializeFirebase() {
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                syncEnabled = true;
-                loadFromFirebase();
-            } else {
-                auth.signInAnonymously().catch(error => {
-                    console.warn('Firebase not available:', error);
+function initializeFirebase() {
+    console.log("Initializing Firebase...");
+
+    auth.onAuthStateChanged(user => {
+        console.log("Auth state changed:", user);
+
+        if (user) {
+            console.log("Logged in anonymously:", user.uid);
+            syncEnabled = true;
+            loadFromFirebase();
+        } else {
+            console.log("No user, attempting anonymous sign-in...");
+
+            auth.signInAnonymously()
+                .then((result) => {
+                    console.log("Anonymous login successful!", result.user.uid);
+                })
+                .catch((error) => {
+                    console.error("Firebase Auth Error");
+                    console.error("Code:", error.code);
+                    console.error("Message:", error.message);
+                    console.error(error);
+
                     syncEnabled = false;
                     updateSyncUI();
                 });
-            }
-        });
-    }
+        }
+    });
+}
 
     // ==================== EXISTING FUNCTIONS ====================
     function resetData() {
