@@ -122,6 +122,10 @@
                     <div id="pay-me-fill" class="progress-fill fill-me" style="width: 0%"></div>
                     <div id="pay-mom-fill" class="progress-fill fill-mom" style="width: 0%"></div>
                 </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.85rem; font-weight: 600;">
+                    <span style="color: var(--me-color)">Me: <span id="pay-me-text">0₪</span></span>
+                    <span style="color: var(--mom-color)">Mom: <span id="pay-mom-text">0₪</span></span>
+                </div>
                 <div class="remaining-box"><span><strong>To Pay:</strong></span><span id="val-remaining" style="color: var(--danger); font-weight: bold;">0₪</span></div>
             </div>
         </div>
@@ -260,41 +264,41 @@
         });
     }
     function loadFromFirebase() {
-    db.ref('drivingTracker/data').on('value', snapshot => {
+        db.ref('drivingTracker/data').on('value', snapshot => {
 
-        if (snapshot.exists()) {
-            const data = snapshot.val();
+            if (snapshot.exists()) {
+                const data = snapshot.val();
 
-            if (data.entries) {
-                state.entries = data.entries;
-                localStorage.setItem(
-                    'driving_tracker_v4',
-                    JSON.stringify(state)
-                );
-                calculateStats();
+                if (data.entries) {
+                    state.entries = data.entries;
+                    localStorage.setItem(
+                        'driving_tracker_v4',
+                        JSON.stringify(state)
+                    );
+                    calculateStats();
+                }
+
+                if (data.lastUpdated) {
+                    lastSyncTime = new Date(data.lastUpdated);
+                }
+
+                syncEnabled = true;
+                updateSyncUI();
+
+            } else {
+                console.log("No cloud data found, creating it...");
+
+                syncEnabled = true;
+                saveToFirebase();
+                updateSyncUI();
             }
 
-            if (data.lastUpdated) {
-                lastSyncTime = new Date(data.lastUpdated);
-            }
-
-            syncEnabled = true;
+        }, error => {
+            console.error("Firebase load error:", error);
+            syncEnabled = false;
             updateSyncUI();
-
-        } else {
-            console.log("No cloud data found, creating it...");
-
-            syncEnabled = true;
-            saveToFirebase();
-            updateSyncUI();
-        }
-
-    }, error => {
-        console.error("Firebase load error:", error);
-        syncEnabled = false;
-        updateSyncUI();
-    });
-}
+        });
+    }
     
     function updateSyncUI() {
         const statusEl = document.getElementById('sync-status');
@@ -367,101 +371,4 @@
         
         const totalPaid = paidMe + paidMom;
         document.getElementById('pay-me-fill').style.width = (paidMe/TOTAL_PROJECTED)*100 + '%';
-        document.getElementById('pay-mom-fill').style.width = (paidMom/TOTAL_PROJECTED)*100 + '%';
-        document.getElementById('val-remaining').innerText = `${Math.max(0, TOTAL_PROJECTED - totalPaid).toLocaleString()}₪`;
-        document.getElementById('total-paid-label').innerText = `${totalPaid.toLocaleString()}₪ / ${TOTAL_PROJECTED.toLocaleString()}₪`;
-        
-        document.getElementById('internal-status').innerText = internalDone ? "✅ Internal Test" : "❌ Internal Test";
-        document.getElementById('external-status').innerText = externalDone ? "✅ External Test" : "❌ External Test";
-        
-        renderCalendar();
-    }
-
-    function renderCalendar() {
-        const body = document.getElementById('calendar-body');
-        const title = document.getElementById('calendar-title');
-        body.innerHTML = '';
-        const m = viewDate.getMonth(), y = viewDate.getFullYear();
-        title.innerText = `${new Intl.DateTimeFormat('en-US', {month:'long'}).format(viewDate)} ${y}`;
-        ['S','M','T','W','T','F','S'].forEach((d,i) => body.innerHTML += `<div class="calendar-day-head ${i>=5?'day-red':''}">${d}</div>`);
-        const first = new Date(y, m, 1).getDay();
-        for(let i=0; i<first; i++) body.innerHTML += '<div></div>';
-        const days = new Date(y, m+1, 0).getDate();
-        for(let d=1; d<=days; d++) {
-            const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-            const entry = state.entries.find(e => e.date === dateStr);
-            const cls = ['calendar-day'];
-            if(dateStr === new Date().toISOString().split('T')[0]) cls.push('day-today');
-            
-            if(entry) {
-                if (entry.booked) cls.push('day-booked');
-                else if (entry.type.includes('test') || entry.type.includes('fee')) cls.push('day-test');
-                else cls.push('day-lesson');
-            }
-            
-            const dayEl = document.createElement('div');
-            dayEl.className = cls.join(' ');
-            dayEl.innerHTML = `<span>${d}</span>`;
-            dayEl.onclick = () => openModal(dateStr);
-            body.appendChild(dayEl);
-        }
-    }
-
-    function openModal(date) {
-        const entry = state.entries.find(e => e.date === date);
-        const delBtn = document.getElementById('modal-delete-btn');
-        document.getElementById('modal-date').value = date;
-        document.getElementById('modal-title').innerText = entry ? `Edit Entry: ${date}` : `New Entry: ${date}`;
-        
-        if (entry) {
-            document.getElementById('modal-type').value = entry.type;
-            document.getElementById('modal-payer').value = entry.payer;
-            document.getElementById('modal-booked').checked = entry.booked;
-            delBtn.classList.remove('hidden');
-            delBtn.onclick = () => {
-                state.entries = state.entries.filter(e => e.date !== date);
-                saveToStorage(); calculateStats(); closeModal();
-            };
-        } else {
-            document.getElementById('modal-type').value = 'lesson-double';
-            document.getElementById('modal-payer').value = 'Me';
-            document.getElementById('modal-booked').checked = false;
-            delBtn.classList.add('hidden');
-        }
-        document.getElementById('lesson-modal').classList.remove('hidden');
-    }
-
-    function closeModal() { document.getElementById('lesson-modal').classList.add('hidden'); }
-
-    document.getElementById('lesson-form').onsubmit = (e) => {
-        e.preventDefault();
-        const date = document.getElementById('modal-date').value;
-        const type = document.getElementById('modal-type').value;
-        const payer = document.getElementById('modal-payer').value;
-        const booked = document.getElementById('modal-booked').checked;
-
-        state.entries = state.entries.filter(e => e.date !== date);
-        state.entries.push({ id: Date.now(), date, type, payer, booked });
-
-        saveToStorage(); calculateStats(); closeModal();
-    };
-
-    function changeMonth(delta) { viewDate.setMonth(viewDate.getMonth() + delta); renderCalendar(); }
-    
-    function showPage(id) {
-        document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
-        document.getElementById('page-' + id).classList.remove('hidden');
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        const navBtn = document.querySelector(`.nav-item[onclick*="${id}"]`);
-        if(navBtn) navBtn.classList.add('active');
-        if(id === 'lessons') renderCalendar();
-    }
-
-    window.addEventListener('load', () => {
-        loadFromFirebase();
-        calculateStats();
-        updateSyncUI();
-    });
-</script>
-</body>
-</html>
+        document.getElementById('pay-mom-fill').
