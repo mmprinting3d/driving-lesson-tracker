@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -122,6 +123,7 @@
                     <div id="pay-me-fill" class="progress-fill fill-me" style="width: 0%"></div>
                     <div id="pay-mom-fill" class="progress-fill fill-mom" style="width: 0%"></div>
                 </div>
+                <!-- Breakdown labels for Me vs. Mom spent amounts -->
                 <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.85rem; font-weight: 600;">
                     <span style="color: var(--me-color)">Me: <span id="pay-me-text">0₪</span></span>
                     <span style="color: var(--mom-color)">Mom: <span id="pay-mom-text">0₪</span></span>
@@ -150,7 +152,16 @@
     <section id="page-settings" class="page hidden">
         <div class="card">
             <h2><i class="fas fa-cog"></i> App Settings</h2>
-            <button class="btn-outline" onclick="resetData()">Reset to Default State</button>
+            <!-- Inline reset confirmation area replacing browser alert confirm -->
+            <div id="reset-confirm-box" class="hidden" style="margin-top: 10px; padding: 15px; background: #fef2f2; border-radius: 8px; border: 1px solid var(--danger);">
+                <p style="font-size: 0.9rem; margin-bottom: 12px; font-weight: 500; color: var(--text);">Are you absolutely sure you want to reset all data to default state?</p>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-delete" style="margin: 0; padding: 8px 16px; font-size: 0.85rem; width: auto;" onclick="confirmReset(true)">Yes, Reset</button>
+                    <button class="btn-cancel" style="margin: 0; padding: 8px 16px; font-size: 0.85rem; width: auto; background: #e2e8f0;" onclick="confirmReset(false)">Cancel</button>
+                </div>
+            </div>
+            <button id="reset-init-btn" class="btn-outline" onclick="showResetConfirm()">Reset to Default State</button>
+            
             <div style="margin-top: 20px; padding: 10px; background: #f0f0f0; border-radius: 8px; font-size: 0.85rem;">
                 <p><strong>Sync Status:</strong> <span id="settings-sync-status">Checking...</span></p>
                 <p id="last-sync" style="margin-top: 8px; color: var(--secondary);"></p>
@@ -263,36 +274,27 @@
             updateSyncUI();
         });
     }
+    
     function loadFromFirebase() {
         db.ref('drivingTracker/data').on('value', snapshot => {
-
             if (snapshot.exists()) {
                 const data = snapshot.val();
-
                 if (data.entries) {
                     state.entries = data.entries;
-                    localStorage.setItem(
-                        'driving_tracker_v4',
-                        JSON.stringify(state)
-                    );
+                    localStorage.setItem('driving_tracker_v4', JSON.stringify(state));
                     calculateStats();
                 }
-
                 if (data.lastUpdated) {
                     lastSyncTime = new Date(data.lastUpdated);
                 }
-
                 syncEnabled = true;
                 updateSyncUI();
-
             } else {
                 console.log("No cloud data found, creating it...");
-
                 syncEnabled = true;
                 saveToFirebase();
                 updateSyncUI();
             }
-
         }, error => {
             console.error("Firebase load error:", error);
             syncEnabled = false;
@@ -325,13 +327,20 @@
         }
     }
 
-    // ==================== EXISTING FUNCTIONS ====================
-    function resetData() {
-        if(confirm("Reset everything?")) {
+    // ==================== REST DATA SECTIONS ====================
+    function showResetConfirm() {
+        document.getElementById('reset-confirm-box').classList.remove('hidden');
+        document.getElementById('reset-init-btn').classList.add('hidden');
+    }
+
+    function confirmReset(agree) {
+        if (agree) {
             state = JSON.parse(JSON.stringify(defaultState));
             saveToStorage();
             calculateStats();
         }
+        document.getElementById('reset-confirm-box').classList.add('hidden');
+        document.getElementById('reset-init-btn').classList.remove('hidden');
     }
 
     function calculateStats() {
@@ -373,7 +382,7 @@
         document.getElementById('pay-me-fill').style.width = (paidMe/TOTAL_PROJECTED)*100 + '%';
         document.getElementById('pay-mom-fill').style.width = (paidMom/TOTAL_PROJECTED)*100 + '%';
         
-        // Dynamic text outputs updated safely here
+        // Dynamically writing exact calculated amounts spent
         document.getElementById('pay-me-text').innerText = `${paidMe.toLocaleString()}₪`;
         document.getElementById('pay-mom-text').innerText = `${paidMom.toLocaleString()}₪`;
         
@@ -397,4 +406,88 @@
         for(let i=0; i<first; i++) body.innerHTML += '<div></div>';
         const days = new Date(y, m+1, 0).getDate();
         for(let d=1; d<=days; d++) {
-            const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${S
+            const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const entry = state.entries.find(e => e.date === dateStr);
+            const cls = ['calendar-day'];
+            if(dateStr === new Date().toISOString().split('T')[0]) cls.push('day-today');
+            
+            if(entry) {
+                if (entry.booked) cls.push('day-booked');
+                else if (entry.type.includes('test') || entry.type.includes('fee')) cls.push('day-test');
+                else cls.push('day-lesson');
+            }
+            
+            const dayEl = document.createElement('div');
+            dayEl.className = cls.join(' ');
+            dayEl.innerHTML = `<span>${d}</span>`;
+            dayEl.onclick = () => openModal(dateStr);
+            body.appendChild(dayEl);
+        }
+    }
+
+    function changeMonth(dir) {
+        viewDate.setMonth(viewDate.getMonth() + dir);
+        renderCalendar();
+    }
+
+    function showPage(pageId) {
+        document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+        document.getElementById(`page-${pageId}`).classList.remove('hidden');
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+    }
+
+    function openModal(dateStr) {
+        const entry = state.entries.find(e => e.date === dateStr);
+        document.getElementById('modal-date').value = dateStr;
+        document.getElementById('modal-title').innerText = dateStr;
+        
+        if(entry) {
+            document.getElementById('modal-type').value = entry.type;
+            document.getElementById('modal-payer').value = entry.payer;
+            document.getElementById('modal-booked').checked = entry.booked;
+            document.getElementById('modal-delete-btn').classList.remove('hidden');
+        } else {
+            document.getElementById('lesson-form').reset();
+            document.getElementById('modal-delete-btn').classList.add('hidden');
+        }
+        document.getElementById('lesson-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+        document.getElementById('lesson-modal').classList.add('hidden');
+    }
+
+    document.getElementById('lesson-form').onsubmit = function(e) {
+        e.preventDefault();
+        const dateStr = document.getElementById('modal-date').value;
+        const type = document.getElementById('modal-type').value;
+        const payer = document.getElementById('modal-payer').value;
+        const booked = document.getElementById('modal-booked').checked;
+        
+        const existingIndex = state.entries.findIndex(entry => entry.date === dateStr);
+        if(existingIndex > -1) {
+            state.entries[existingIndex] = { id: state.entries[existingIndex].id, date: dateStr, type, payer, booked };
+        } else {
+            state.entries.push({ id: Date.now(), date: dateStr, type, payer, booked });
+        }
+        
+        saveToStorage();
+        calculateStats();
+        closeModal();
+    };
+
+    document.getElementById('modal-delete-btn').onclick = function() {
+        const dateStr = document.getElementById('modal-date').value;
+        state.entries = state.entries.filter(entry => entry.date !== dateStr);
+        saveToStorage();
+        calculateStats();
+        closeModal();
+    };
+
+    // ==================== INIT ====================
+    calculateStats();
+    loadFromFirebase();
+</script>
+</body>
+</html>
