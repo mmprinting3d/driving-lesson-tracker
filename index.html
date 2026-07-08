@@ -371,4 +371,30 @@
         
         const totalPaid = paidMe + paidMom;
         document.getElementById('pay-me-fill').style.width = (paidMe/TOTAL_PROJECTED)*100 + '%';
-        document.getElementById('pay-mom-fill').
+        document.getElementById('pay-mom-fill').style.width = (paidMom/TOTAL_PROJECTED)*100 + '%';
+        
+        // Dynamic text outputs updated safely here
+        document.getElementById('pay-me-text').innerText = `${paidMe.toLocaleString()}₪`;
+        document.getElementById('pay-mom-text').innerText = `${paidMom.toLocaleString()}₪`;
+        
+        document.getElementById('val-remaining').innerText = `${Math.max(0, TOTAL_PROJECTED - totalPaid).toLocaleString()}₪`;
+        document.getElementById('total-paid-label').innerText = `${totalPaid.toLocaleString()}₪ / ${TOTAL_PROJECTED.toLocaleString()}₪`;
+        
+        document.getElementById('internal-status').innerText = internalDone ? "✅ Internal Test" : "❌ Internal Test";
+        document.getElementById('external-status').innerText = externalDone ? "✅ External Test" : "❌ External Test";
+        
+        renderCalendar();
+    }
+
+    function renderCalendar() {
+        const body = document.getElementById('calendar-body');
+        const title = document.getElementById('calendar-title');
+        body.innerHTML = '';
+        const m = viewDate.getMonth(), y = viewDate.getFullYear();
+        title.innerText = `${new Intl.DateTimeFormat('en-US', {month:'long'}).format(viewDate)} ${y}`;
+        ['S','M','T','W','T','F','S'].forEach((d,i) => body.innerHTML += `<div class="calendar-day-head ${i>=5?'day-red':''}">${d}</div>`);
+        const first = new Date(y, m, 1).getDay();
+        for(let i=0; i<first; i++) body.innerHTML += '<div></div>';
+        const days = new Date(y, m+1, 0).getDate();
+        for(let d=1; d<=days; d++) {
+            const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${S
