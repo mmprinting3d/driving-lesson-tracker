@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -83,7 +82,7 @@
         .btn-cancel { background: #f1f5f9; color: var(--text); border: none; margin-top: 10px; font-size: 0.9rem; padding: 0.8rem; border-radius: 8px; cursor: pointer; width: 100%; font-weight: 600; }
         .btn-delete { background: var(--danger); color: white; border: none; margin-top: 10px; font-size: 0.9rem; padding: 0.8rem; border-radius: 8px; cursor: pointer; width: 100%; font-weight: 600; }
 
-        .hidden { display: none; }
+        .hidden { display: none !important; }
         .remaining-box { margin-top: 15px; padding: 10px; background: #fdf2f2; border-left: 4px solid var(--danger); border-radius: 4px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
         
         .sync-status { 
@@ -123,7 +122,6 @@
                     <div id="pay-me-fill" class="progress-fill fill-me" style="width: 0%"></div>
                     <div id="pay-mom-fill" class="progress-fill fill-mom" style="width: 0%"></div>
                 </div>
-                <!-- Breakdown labels for Me vs. Mom spent amounts -->
                 <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.85rem; font-weight: 600;">
                     <span style="color: var(--me-color)">Me: <span id="pay-me-text">0₪</span></span>
                     <span style="color: var(--mom-color)">Mom: <span id="pay-mom-text">0₪</span></span>
@@ -152,7 +150,6 @@
     <section id="page-settings" class="page hidden">
         <div class="card">
             <h2><i class="fas fa-cog"></i> App Settings</h2>
-            <!-- Inline reset confirmation area replacing browser alert confirm -->
             <div id="reset-confirm-box" class="hidden" style="margin-top: 10px; padding: 15px; background: #fef2f2; border-radius: 8px; border: 1px solid var(--danger);">
                 <p style="font-size: 0.9rem; margin-bottom: 12px; font-weight: 500; color: var(--text);">Are you absolutely sure you want to reset all data to default state?</p>
                 <div style="display: flex; gap: 10px;">
@@ -206,6 +203,28 @@
     </div>
 </div>
 
+<div id="login-modal" class="modal hidden">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 style="font-size:1.1rem;">Driving Tracker Login</h2>
+        </div>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="login-email">Email Address *</label>
+                <input type="email" id="login-email" required placeholder="your@email.com">
+            </div>
+            <div class="form-group">
+                <label for="login-password">Password *</label>
+                <input type="password" id="login-password" required placeholder="••••••••">
+            </div>
+            <div class="form-actions" style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
+                <span id="login-error" style="color: var(--danger); font-size: 0.85rem;"></span>
+                <button type="submit" class="btn-primary" style="width: auto; padding: 10px 20px;">Sign In</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <nav class="bottom-nav">
     <button class="nav-item active" onclick="showPage('home')"><i class="fas fa-home"></i><span>Home</span></button>
     <button class="nav-item" onclick="showPage('lessons')"><i class="fas fa-calendar-alt"></i><span>Lessons</span></button>
@@ -214,6 +233,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 
 <script>
     // ==================== FIREBASE CONFIG ====================
@@ -229,6 +249,7 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    const auth = firebase.auth();
     
     let syncEnabled = true;
     let lastSyncTime = null;
@@ -327,7 +348,7 @@
         }
     }
 
-    // ==================== REST DATA SECTIONS ====================
+    // ==================== RESET DATA SECTIONS ====================
     function showResetConfirm() {
         document.getElementById('reset-confirm-box').classList.remove('hidden');
         document.getElementById('reset-init-btn').classList.add('hidden');
@@ -382,7 +403,6 @@
         document.getElementById('pay-me-fill').style.width = (paidMe/TOTAL_PROJECTED)*100 + '%';
         document.getElementById('pay-mom-fill').style.width = (paidMom/TOTAL_PROJECTED)*100 + '%';
         
-        // Dynamically writing exact calculated amounts spent
         document.getElementById('pay-me-text').innerText = `${paidMe.toLocaleString()}₪`;
         document.getElementById('pay-mom-text').innerText = `${paidMom.toLocaleString()}₪`;
         
@@ -485,9 +505,37 @@
         closeModal();
     };
 
-    // ==================== INIT ====================
-    calculateStats();
-    loadFromFirebase();
+    // ==================== AUTH STATE & LOGIN ====================
+    const loginModal = document.getElementById('login-modal');
+    const loginForm = document.getElementById('login-form');
+    const loginEmailInput = document.getElementById('login-email');
+    const loginPasswordInput = document.getElementById('login-password');
+    const loginErrorSpan = document.getElementById('login-error');
+
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            loginModal.classList.add('hidden');
+            calculateStats();
+            loadFromFirebase();
+        } else {
+            loginModal.classList.remove('hidden');
+        }
+    });
+
+    loginForm.onsubmit = async function(e) {
+        e.preventDefault();
+        loginErrorSpan.textContent = "";
+        
+        const email = loginEmailInput.value.trim();
+        const password = loginPasswordInput.value;
+
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+        } catch (err) {
+            loginErrorSpan.textContent = "Invalid email or password.";
+            console.error("Login error:", err.message);
+        }
+    };
 </script>
 </body>
 </html>
