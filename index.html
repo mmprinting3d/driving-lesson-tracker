@@ -107,12 +107,12 @@
                 <div class="label-group"><span>Completed</span><span id="lesson-stats">0 / 37.5</span></div>
                 <div class="progress-bar-bg"><div id="lesson-progress-fill" class="progress-fill fill-primary" style="width: 0%"></div></div>
             </div>
-            <div id="milestone-list" style="font-size: 0.85rem; line-height: 1.8;">
-                <p id="theory-status">✅ Theory Test</p>
-                <p id="internal-status">❌ Internal Test</p>
-                <p id="external-status">❌ External Test</p>
-            </div>
-        </div>
+    <div id="milestone-list" style="font-size: 0.85rem; line-height: 1.8;">
+    <p id="theory-status">✅ Theory Test</p>
+    <p id="internal-status">❌ Internal Test</p>
+    <p id="external-status">❌ External Test</p>
+    <p id="test-counter-status" style="font-weight: bold; margin-top: 5px; color: var(--primary);">🚗 Tests Taken: 0</p>
+</div>
 
         <div class="card">
             <h2><i class="fas fa-wallet"></i> Payment Tracker (₪)</h2>
@@ -175,13 +175,13 @@
             <div class="form-group">
                 <label>What happened today?</label>
                 <select id="modal-type">
-                    <option value="lesson-double">Double Lesson (370₪)</option>
-                    <option value="lesson-extra">1.5 Lesson (277.5₪)</option>
-                    <option value="internal-test">Internal Test (200₪)</option>
-                    <option value="external-test">External Test (361₪)</option>
-                    <option value="license-fee">License Fee (94₪)</option>
-                    <option value="theory-test">Theory Test (76₪)</option>
-                    <option value="signup-fee">Registration Fee (200₪)</option>
+                  <option value="lesson-double">Double Lesson (370₪)</option>
+                  <option value="lesson-extra">1.5 Lesson (277.5₪)</option>
+                  <option value="internal-test">Internal Test (250₪)</option>
+                  <option value="external-test">External Test (579₪)</option>
+                  <option value="license-fee">License Fee (110₪)</option>
+                  <option value="theory-test">Theory Test (80₪)</option>
+                  <option value="signup-fee">Registration Fee (200₪)</option>
                 </select>
             </div>
             <div class="form-group">
@@ -255,8 +255,8 @@
     let lastSyncTime = null;
 
     // ==================== APP CODE ====================
-    const TARGET_SINGLE_LESSONS = 37.5;
-    const TOTAL_PROJECTED = 7868.5;
+    const TARGET_SINGLE_LESSONS = 48;
+    const TOTAL_PROJECTED = 8880;
     let viewDate = new Date();
 
     const defaultState = {
@@ -364,56 +364,72 @@
         document.getElementById('reset-init-btn').classList.remove('hidden');
     }
 
-    function calculateStats() {
-        let totalSingleLessons = 0, paidMe = 0, paidMom = 0;
-        let internalDone = false, externalDone = false;
+function calculateStats() {
+    let totalSingleLessons = 0, paidMe = 0, paidMom = 0;
+    let internalDone = false, externalDone = false;
+    let testCount = 0; 
 
-        const prices = {
-            'lesson-double': 370,
-            'lesson-extra': 277.5,
-            'internal-test': 200,
-            'external-test': 361,
-            'license-fee': 94,
-            'theory-test': 76,
-            'signup-fee': 200
-        };
+    const prices = {
+        'lesson-double': 370,
+        'lesson-extra': 277.5,
+        'internal-test': 250, 
+        'external-test': 579, 
+        'license-fee': 110,
+        'theory-test': 80,
+        'signup-fee': 200
+    };
 
-        paidMom += 200;
+    paidMom += 200;
 
-        state.entries.forEach(e => {
-            if (!e.booked) {
-                let cost = prices[e.type] || 0;
-                
-                if (e.type === 'lesson-double') totalSingleLessons += 2;
-                if (e.type === 'lesson-extra') totalSingleLessons += 1.5;
-                
-                if (e.type === 'internal-test') internalDone = true;
-                if (e.type === 'external-test') externalDone = true;
-
-                if (e.payer === 'Me') paidMe += cost;
-                else if (e.payer === 'Mom') paidMom += cost;
-                else { paidMe += cost/2; paidMom += cost/2; }
+    state.entries.forEach(e => {
+        if (!e.booked) {
+            let cost = prices[e.type] || 0;
+            
+            // --- ONLY count actual driving lessons for the lesson progress bar ---
+            if (e.type === 'lesson-double') {
+                totalSingleLessons += 2;
+            } else if (e.type === 'lesson-extra') {
+                totalSingleLessons += 1.5;
             }
-        });
+            
+            // --- Track tests separately ---
+            if (e.type === 'internal-test') {
+                internalDone = true;
+                testCount++; 
+            }
+            if (e.type === 'external-test') {
+                externalDone = true;
+                testCount++; 
+            }
 
-        document.getElementById('lesson-progress-fill').style.width = Math.min((totalSingleLessons/TARGET_SINGLE_LESSONS)*100, 100) + '%';
-        document.getElementById('lesson-stats').innerText = `${totalSingleLessons} / ${TARGET_SINGLE_LESSONS}`;
-        
-        const totalPaid = paidMe + paidMom;
-        document.getElementById('pay-me-fill').style.width = (paidMe/TOTAL_PROJECTED)*100 + '%';
-        document.getElementById('pay-mom-fill').style.width = (paidMom/TOTAL_PROJECTED)*100 + '%';
-        
-        document.getElementById('pay-me-text').innerText = `${paidMe.toLocaleString()}₪`;
-        document.getElementById('pay-mom-text').innerText = `${paidMom.toLocaleString()}₪`;
-        
-        document.getElementById('val-remaining').innerText = `${Math.max(0, TOTAL_PROJECTED - totalPaid).toLocaleString()}₪`;
-        document.getElementById('total-paid-label').innerText = `${totalPaid.toLocaleString()}₪ / ${TOTAL_PROJECTED.toLocaleString()}₪`;
-        
-        document.getElementById('internal-status').innerText = internalDone ? "✅ Internal Test" : "❌ Internal Test";
-        document.getElementById('external-status').innerText = externalDone ? "✅ External Test" : "❌ External Test";
-        
-        renderCalendar();
-    }
+            // --- Track payments for everything (lessons + fees) ---
+            if (e.payer === 'Me') paidMe += cost;
+            else if (e.payer === 'Mom') paidMom += cost;
+            else { paidMe += cost/2; paidMom += cost/2; }
+        }
+    });
+
+    // Lesson progress now strictly relies on totalSingleLessons vs TARGET_SINGLE_LESSONS (48)
+    document.getElementById('lesson-progress-fill').style.width = Math.min((totalSingleLessons/TARGET_SINGLE_LESSONS)*100, 100) + '%';
+    document.getElementById('lesson-stats').innerText = `${totalSingleLessons} / ${TARGET_SINGLE_LESSONS}`;
+    
+    const totalPaid = paidMe + paidMom;
+    document.getElementById('pay-me-fill').style.width = (paidMe/TOTAL_PROJECTED)*100 + '%';
+    document.getElementById('pay-mom-fill').style.width = (paidMom/TOTAL_PROJECTED)*100 + '%';
+    
+    document.getElementById('pay-me-text').innerText = `${paidMe.toLocaleString()}₪`;
+    document.getElementById('pay-mom-text').innerText = `${paidMom.toLocaleString()}₪`;
+    
+    document.getElementById('val-remaining').innerText = `${Math.max(0, TOTAL_PROJECTED - totalPaid).toLocaleString()}₪`;
+    document.getElementById('total-paid-label').innerText = `${totalPaid.toLocaleString()}₪ / ${TOTAL_PROJECTED.toLocaleString()}₪`;
+    
+    document.getElementById('internal-status').innerText = internalDone ? "✅ Internal Test" : "❌ Internal Test";
+    document.getElementById('external-status').innerText = externalDone ? "✅ External Test" : "❌ External Test";
+    
+    document.getElementById('test-counter-status').innerText = `🚗 Tests Taken: ${testCount}`;
+    
+    renderCalendar();
+}
 
     function renderCalendar() {
         const body = document.getElementById('calendar-body');
